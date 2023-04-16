@@ -1,0 +1,28 @@
+[project]
+name = "vinted_bot"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "", email = ""},
+]
+dependencies = [
+    "discord-py>=2.2.2",
+    "flask>=2.2.3",
+    "sqlalchemy>=2.0.9",
+    "apscheduler>=3.10.1",
+]
+requires-python = ">=3.11"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["pdm-pep517>=1.0"]
+build-backend = "pdm.pep517.api"
+
+[project.scripts]
+
+[tool.pdm]
+[tool.pdm.scripts]
+_.env_file = ".env"
+v = {call="vinted_bot.main:main"}
+l = {call="vinted_bot.loop:loop"}
