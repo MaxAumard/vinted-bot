@@ -60,3 +60,8 @@ def get_all_channel_bot():
     with engine.begin() as connection:
         result = connection.execute(select(channel_bot_table)).all()
     return [ChannelsBot(*row) for row in result]
+
+def update_webhook_name(channel_id, webhook_name):
+    update_statement = channel_bot_table.update().where(channel_bot_table.c.channel_id == channel_id).values(webhook_name=webhook_name)
+    with engine.begin() as conn:
+        result = conn.execute(update_statement)

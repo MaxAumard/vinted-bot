@@ -6,7 +6,7 @@ import discord.ext
 from discord.ext import commands
 from flask import Flask
 
-from vinted_bot.models.channels_bot import insert_channel_bot, get_all_channel_bot, get_channel_bot, delete_channel_bot
+from vinted_bot.models.channels_bot import insert_channel_bot, get_all_channel_bot, get_channel_bot, delete_channel_bot, update_webhook_name
 from vinted_bot.models.searches import insert_search, get_searches_by_channel, delete_search, delete_search_by_channel
 
 app = Flask(__name__)
@@ -39,7 +39,7 @@ async def on_ready():
 
 
 @bot.command()
-async def add_bot(ctx, bot_name):
+async def add_bot(ctx, bot_name=None):
     # si il y a deja un webhook dans ma base de donnée dans le meme channel, alors ne fait rien
     if channel_bot := get_channel_bot(ctx.channel.id):
         await ctx.send(
@@ -47,21 +47,41 @@ async def add_bot(ctx, bot_name):
         return
 
     # sinon, crée le webhook et l'ajoute dans la base de donnée
+    if not bot_name:
+        bot_name = "Vinted Bot"
     webhook = await ctx.channel.create_webhook(name=bot_name)
     insert_channel_bot(ctx.channel.id, webhook.id, webhook.name, webhook.url)
     await ctx.send(f"{ctx.author.mention} - **✔️ Bot {bot_name} ajouté au channel !**")
 
+@bot.command()
+async def rename_bot(ctx, new_name=None):
+    if not new_name:
+        await ctx.send(f"{ctx.author.mention} - **❌ Veuillez renseigner un nouveau nom !**")
+        return
+    wh = get_channel_bot(ctx.channel.id)
+    if not wh:
+        await ctx.send(f"{ctx.author.mention} - **❌ Aucun bot n'est présent dans ce channel !**")
+        return
+    webhook = await bot.fetch_webhook(wh.webhook_id)
+    await webhook.edit(name=new_name)
+    update_webhook_name(ctx.channel.id, new_name)
+    await ctx.send(f"{ctx.author.mention} - **✔️ Bot renommé en {new_name} !**")
+
+
+
 
 @bot.command()
-async def remove_bot(ctx, bot_name):
+async def remove_bot(ctx):
     inside = False
+    wh = get_channel_bot(ctx.channel.id)
     for webhook in await ctx.channel.webhooks():
-        if webhook.name == bot_name:
+        if str(webhook.id) == wh.webhook_id:
             await webhook.delete()
-            await ctx.send(f"{ctx.author.mention} - **✔️ Bot {bot_name} supprimé du channel !**")
+            await ctx.send(f"{ctx.author.mention} - **✔️ Bot {wh.webhook_name} supprimé du channel !**")
             inside = True
+            break
     if not inside:
-        await ctx.send(f"{ctx.author.mention} - **❌ Le bot {bot_name} n'est pas présent dans ce channel !**")
+        await ctx.send(f"{ctx.author.mention} - **❌ Aucun bot n'est présent dans ce channel !**")
         return
     delete_channel_bot(ctx.channel.id)
     delete_search_by_channel(ctx.channel.id)
@@ -77,12 +97,16 @@ async def searches(ctx):
 
     embed = discord.Embed(title="Searches Bot", color=0xFFFFFF)
     for search in searches:
-        embed.add_field(name=search.search, value="", inline=False)
+        if search.max_price:
+            embed.add_field(name=search.search, value=f"Prix max: {search.max_price}", inline=False)
+            continue
+        embed.add_field(name=search.search, value="Pas de prix max", inline=False)
+
     await ctx.send(embed=embed)
 
 
 @bot.command()
-async def add_search(ctx, search):
+async def add_search(ctx, search, max_price=None):
     if not get_channel_bot(ctx.channel.id):
         await ctx.send(
             f"{ctx.author.mention} - **❌ Aucun bot n'est présent dans ce channel !**")
@@ -93,7 +117,16 @@ async def add_search(ctx, search):
             await ctx.send(
                 f"{ctx.author.mention} - **❌ La recherche {search} est déjà présente dans ce channel !**")
             return
-    insert_search(ctx.channel.id, search)
+    if max_price:
+        try:
+            max_price = float(max_price)
+            insert_search(ctx.channel.id, search, max_price)
+            await ctx.send(f"{ctx.author.mention} - **✔️ Recherche {search} avec prix maximum de {max_price}€ ajoutée au channel !**")
+            return
+        except ValueError:
+            await ctx.send(f"{ctx.author.mention} - **❌ Le prix maximum doit être un nombre !**")
+            return
+    insert_search(ctx.channel.id, search, None)
     await ctx.send(f"{ctx.author.mention} - **✔️ Recherche {search} ajoutée au channel !**")
 
 

@@ -63,23 +63,27 @@ def search_on_vinted(searches: list[Search]) -> dict[str, list[Item]]:
             for item in items:
                 image_item = item.find_elements(By.CLASS_NAME, "web_ui__Image__content")[1]
                 image = image_item.get_attribute("src")
-                price = item.find_element(By.CLASS_NAME, "web_ui__Text__subtitle").text
+                price = item.find_element(By.TAG_NAME, 'h3').text
                 link = item.find_element(By.CLASS_NAME, "web_ui__ItemBox__overlay").get_attribute("href")
                 title = image_item.get_attribute("alt")
                 datas[search.search].append(Item(id=uuid.uuid4(),
                                                  search=search.search,
                                                  image=image,
-                                                 price=price,
+                                                 price=price[:-2].replace(",", "."),
                                                  title=title,
                                                  url=link, ))
     return datas
 
 
 async def send_items(search, new_items):
-    webhook_urls = [search_object.webhook_url for search_object in get_searches_by_search(search)]
-    for webhook_url in webhook_urls:
+    searches = [search_object for search_object in get_searches_by_search(search)]
+    for search in searches:
+        if search.max_price:
+            new_items = [item for item in new_items if float(item.price) <= float(search.max_price)]
+        if not new_items:
+            continue
         async with aiohttp.ClientSession() as session:
-            webhook = Webhook.from_url(webhook_url, session=session)
+            webhook = Webhook.from_url(search.webhook_url, session=session)
             for new_item in new_items:
                 embed = Embed(title=new_item.title, url=new_item.url)
                 embed.add_field(name="Recherche : ", value=new_item.search, inline=False)
@@ -87,14 +91,16 @@ async def send_items(search, new_items):
                 embed.set_image(url=new_item.image)
                 await webhook.send(embed=embed)
 
+
 def loop():
     logging.info("Bot en fonctionnement : " + str(datetime.now())[:-7])
     scheduler = BlockingScheduler()
-    scheduler.add_job(detector, 'interval', minutes=5)
+    scheduler.add_job(detector, 'interval', minutes=1)
     try:
         scheduler.start()
     except (KeyboardInterrupt, SystemExit):
         raise
+
 
 def detector():
     searches: list[Search] = get_all_searches()
@@ -111,7 +117,6 @@ def detector():
             if item.image in [i.image for i in buffer_item]:
                 break
             new_items.append(item)
-
 
         if new_items:
             asyncio.run(send_items(search, new_items))
