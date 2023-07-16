@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from sqlalchemy import Column, String, Integer, Table, insert, delete, select, DateTime, Uuid
+from sqlalchemy import Column, String, Table, insert, delete, Uuid
 
 from vinted_bot.models import metadata, engine
 
@@ -26,7 +26,7 @@ class Item:
     url: str
 
 
-def insert_buffer_item(id,search, image, price, title, url) -> str:
+def insert_buffer_item(id, search, image, price, title, url) -> str:
     insert_statement = insert(buffer_item_table).values(
         id=uuid.uuid4(),
         search=search,
@@ -47,6 +47,7 @@ def get_buffer_items(search) -> list[Item] | None:
         return [Item(*row) for row in result]
     except Exception:
         return None
+
 
 def delete_buffer_item(search):
     delete_statement = delete(buffer_item_table).where(buffer_item_table.c.search == search)
