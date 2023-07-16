@@ -14,7 +14,6 @@ search_table = Table(
     Column("webhook_url", String, nullable=False),
     Column("add_at", DateTime, default=datetime.utcnow),
     Column("search", String, nullable=False),
-    Column("max_price", Integer, nullable=True),
 )
 
 
@@ -25,17 +24,15 @@ class Search:
     webhook_url: str
     add_at: datetime
     search: str
-    max_price: int
 
 
-def insert_search(channel_id, search, max_price) -> uuid.UUID:
+def insert_search(channel_id, search) -> uuid.UUID:
     insert_statement = insert(search_table).values(
         id=uuid.uuid4(),
         channel_id=channel_id,
         webhook_url=get_channel_bot(channel_id).webhook_url,
         search=search,
-        add_at=datetime.utcnow(),
-        max_price=max_price,
+        add_at=datetime.utcnow()
     )
     with engine.begin() as conn:
         result = conn.execute(insert_statement)
